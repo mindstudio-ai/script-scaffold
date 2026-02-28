@@ -1,0 +1,19 @@
+{
+  "name": "mindstudio-script-scaffold",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "MINDSTUDIO_REUSE_THREAD_ID=true npx tsx src/index.ts",
+    "dev:local": "npx tsx .remy/local.ts"
+  },
+  "dependencies": {
+    "@mindstudio-ai/agent": "^0.0.13",
+    "chokidar": "^4.0.3",
+    "tsx": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "typescript": "^5.9.3"
+  }
+}
