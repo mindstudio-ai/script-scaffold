@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 
 const LOCAL_FILE = path.resolve(process.cwd(), 'src', 'index.ts');
 const API_BASE =
-  process.env.MINDSTUDIO_API_URL || 'https://api.mindstudio.ai';
+  process.env.MINDSTUDIO_API_URL || 'https://v1.mindstudio-api.com';
 
 // ANSI formatting
 const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
