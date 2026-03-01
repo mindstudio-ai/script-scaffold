@@ -8,6 +8,8 @@ import WebSocket from 'ws';
 const LOCAL_FILE = path.resolve(process.cwd(), 'src', 'index.ts');
 const API_BASE =
   process.env.MINDSTUDIO_API_URL || 'https://v1.mindstudio-api.com';
+const WS_BASE =
+  process.env.MINDSTUDIO_WS_URL || 'wss://api-socket.mindstudio.ai';
 
 // ANSI formatting
 const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
@@ -83,7 +85,7 @@ function getScriptUrl(
 }
 
 function getWsUrl(): string {
-  return API_BASE.replace(/^http/, 'ws') + '/local-editor';
+  return WS_BASE + '/local-editor';
 }
 
 async function fetchRemoteCode(
@@ -115,6 +117,7 @@ function connectWebSocket(
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(getWsUrl(), ['auth', key]);
     let connected = false;
+    console.log(key);
 
     ws.on('message', (data) => {
       try {
