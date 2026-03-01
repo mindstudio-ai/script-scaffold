@@ -117,7 +117,6 @@ function connectWebSocket(
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(getWsUrl(), ['auth', key]);
     let connected = false;
-    console.log(key);
 
     ws.on('message', (data) => {
       try {
