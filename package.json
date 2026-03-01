@@ -10,10 +10,12 @@
   "dependencies": {
     "@mindstudio-ai/agent": "^0.0.13",
     "chokidar": "^4.0.3",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.9.3"
   }
 }

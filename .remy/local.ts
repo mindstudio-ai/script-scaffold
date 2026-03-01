@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import WebSocket from 'ws';
 
 const LOCAL_FILE = path.resolve(process.cwd(), 'src', 'index.ts');
 const API_BASE =
@@ -73,7 +74,7 @@ function parseArgs(): {
 // API
 ////////////////////////////////////////////////////////////////////////////////
 
-function getEndpointUrl(
+function getScriptUrl(
   app: string,
   workflow: string,
   step: string,
@@ -81,10 +82,14 @@ function getEndpointUrl(
   return `${API_BASE}/v1/local-editor/apps/${app}/workflows/${workflow}/steps/${step}/script`;
 }
 
+function getWsUrl(): string {
+  return API_BASE.replace(/^http/, 'ws') + '/local-editor';
+}
+
 async function fetchRemoteCode(
   url: string,
   key: string,
-): Promise<{ code: string; entryFile: string }> {
+): Promise<{ files: Record<string, string>; entryFile: string }> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${key}` },
   });
@@ -97,24 +102,59 @@ async function fetchRemoteCode(
   return res.json();
 }
 
-async function pushCode(
-  url: string,
-  key: string,
-  code: string,
-): Promise<void> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ code }),
-  });
+////////////////////////////////////////////////////////////////////////////////
+// WebSocket
+////////////////////////////////////////////////////////////////////////////////
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`POST failed (${res.status}): ${body || res.statusText}`);
-  }
+function connectWebSocket(
+  key: string,
+  app: string,
+  workflow: string,
+  step: string,
+): Promise<WebSocket> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(getWsUrl(), ['auth', key]);
+    let connected = false;
+
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'General/ConnectionEstablished' && !connected) {
+          connected = true;
+          ws.send(
+            JSON.stringify({
+              type: 'LocalEditor/Register',
+              appId: app,
+              workflowId: workflow,
+              stepId: step,
+            }),
+          );
+          resolve(ws);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    });
+
+    ws.on('error', (err) => {
+      if (!connected) reject(err);
+    });
+
+    ws.on('close', () => {
+      if (!connected)
+        reject(new Error('WebSocket closed before connection was established'));
+    });
+  });
+}
+
+function pushCode(ws: WebSocket, code: string): void {
+  ws.send(
+    JSON.stringify({
+      type: 'LocalEditor/ScriptCodeUpdated',
+      file: 'index.ts',
+      code,
+    }),
+  );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +166,7 @@ const hash = (content: string) =>
 
 let lastHash = '';
 
-function startWatcher(url: string, key: string) {
+function startWatcher(ws: WebSocket) {
   const watcher = chokidar.watch(LOCAL_FILE, {
     // Wait for writes to finish before firing — handles editors and tools
     // (like Claude Code) that do multiple rapid writes to the same file.
@@ -145,7 +185,7 @@ function startWatcher(url: string, key: string) {
       lastHash = h;
 
       log('Change detected, pushing to remote...');
-      await pushCode(url, key, code);
+      pushCode(ws, code);
       log('Synced.');
     } catch (err: any) {
       log(`Error syncing: ${err.message}`);
@@ -183,11 +223,14 @@ function printBanner(direction: string) {
 
 async function main() {
   const { key, app, workflow, step } = parseArgs();
-  const url = getEndpointUrl(app, workflow, step);
+  const scriptUrl = getScriptUrl(app, workflow, step);
 
   log('Fetching remote code...');
+  const { files } = await fetchRemoteCode(scriptUrl, key);
+  const remoteCode = files['index.ts'] || '';
 
-  const { code: remoteCode } = await fetchRemoteCode(url, key);
+  log('Connecting to MindStudio...');
+  const ws = await connectWebSocket(key, app, workflow, step);
 
   const hasLocalFile = fssync.existsSync(LOCAL_FILE);
   const localCode = hasLocalFile
@@ -205,14 +248,19 @@ async function main() {
   } else if (!localIsEmpty) {
     // Local code exists — push to remote
     lastHash = hash(localCode);
-    await pushCode(url, key, localCode);
+    pushCode(ws, localCode);
     direction = 'local → remote';
   } else {
     lastHash = '';
     direction = 'synced';
   }
 
-  startWatcher(url, key);
+  ws.on('close', () => {
+    log('Connection closed.');
+    process.exit(0);
+  });
+
+  startWatcher(ws);
   printBanner(direction);
 }
 
