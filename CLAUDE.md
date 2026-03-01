@@ -49,6 +49,25 @@ const { content } = await agent.generateText({
 });
 ```
 
+### Global variables
+
+Global variables are shared across all workflows in the app and persist across runs for a given user. They are available under `ai.vars` with the `global.` prefix:
+
+```typescript
+export const handler = async () => {
+  // Read global variables
+  const lastResult = ai.vars['global.lastResult'];
+
+  // Do some work
+  const newResult = ...
+
+  // You can use setVariable to write to a global variable
+  await agent.setVariable('global.lastResult', newResult)
+
+  return { newResult };
+};
+```
+
 ## Local Dev
 
 To develop locally against MindStudio:
