@@ -253,7 +253,9 @@ async function main() {
     pushCode(ws, localCode);
     direction = 'local → remote';
   } else {
-    lastHash = '';
+    // Both empty — create the file so the watcher can pick up future edits
+    await fsp.writeFile(LOCAL_FILE, '', 'utf8');
+    lastHash = hash('');
     direction = 'synced';
   }
 
